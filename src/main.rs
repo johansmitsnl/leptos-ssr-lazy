@@ -1,4 +1,3 @@
-
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {
@@ -7,6 +6,12 @@ async fn main() {
     use leptos::prelude::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
     use leptos_ssr_lazy::app::*;
+
+    let semver = option_env!("VERGEN_RUSTC_SEMVER").unwrap_or("unknown");
+    let channel = option_env!("VERGEN_RUSTC_CHANNEL").unwrap_or("unknown");
+    let host = option_env!("VERGEN_RUSTC_HOST_TRIPLE").unwrap_or("unknown");
+    let commit = option_env!("VERGEN_RUSTC_COMMIT_HASH").unwrap_or("unknown");
+    log!("rustc {semver} [{channel}] on {host} ({commit})");
 
     let conf = get_configuration(None).unwrap();
     let addr = conf.leptos_options.site_addr;
