@@ -5,6 +5,21 @@ use leptos_router::{
     lazy_route, Lazy, LazyRoute, StaticSegment,
 };
 
+mod start {
+    pub enum Initial {
+        Zero,
+        Ten,
+    }
+
+    pub async fn load_site() -> bool {
+        true
+    }
+
+    pub async fn login_check() -> bool {
+        true
+    }
+}
+
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
       <!DOCTYPE html>
@@ -41,14 +56,26 @@ pub fn App() -> impl IntoView {
         <main>
           <Routes fallback={|| "Page not found.".into_view()}>
             <ParentRoute
-              path={StaticSegment("/console")}
-              view={Lazy::<ConsoleRoute>::new()}
+              path={StaticSegment("")}
+              view={move || {
+                view! {
+                  <Await future={async move { start::load_site().await }} let:_data>
+                    <Outlet />
+                  </Await>
+                }
+              }}
             >
-              <Route
-                path={StaticSegment("/")}
-                view={move || view! { <Redirect path="/console/home" /> }}
-              />
-              <Route path={StaticSegment("/home")} view={Lazy::<HomeRoute>::new()} />
+              <ParentRoute
+                path={StaticSegment("/console")}
+                view={Lazy::<ConsoleRoute>::new()}
+              >
+                <Route
+                  path={StaticSegment("/")}
+                  view={move || view! { <Redirect path="/console/home-a" /> }}
+                />
+                <Route path={StaticSegment("/home-a")} view={Lazy::<HomeRouteA>::new()} />
+              </ParentRoute>
+              <Route path={StaticSegment("/home-b")} view={Lazy::<HomeRouteB>::new()} />
             </ParentRoute>
           </Routes>
         </main>
@@ -58,9 +85,13 @@ pub fn App() -> impl IntoView {
 
 /// Renders the home page of your application.
 #[component]
-fn HomePage() -> impl IntoView {
+fn HomePage(initial: start::Initial) -> impl IntoView {
     // Creates a reactive value to update the button
-    let count = RwSignal::new(0);
+    let initial = match initial {
+        start::Initial::Zero => 0i32,
+        start::Initial::Ten => 10i32,
+    };
+    let count = RwSignal::new(initial);
     let on_click = move |_| *count.write() += 1;
 
     view! {
@@ -69,15 +100,27 @@ fn HomePage() -> impl IntoView {
     }
 }
 
-struct HomeRoute;
+struct HomeRouteA;
 #[lazy_route]
-impl LazyRoute for HomeRoute {
+impl LazyRoute for HomeRouteA {
     fn data() -> Self {
         Self
     }
 
     fn view(_this: Self) -> AnyView {
-        view! { <HomePage /> }.into_any()
+        view! { <HomePage initial={start::Initial::Zero} /> }.into_any()
+    }
+}
+
+struct HomeRouteB;
+#[lazy_route]
+impl LazyRoute for HomeRouteB {
+    fn data() -> Self {
+        Self
+    }
+
+    fn view(_this: Self) -> AnyView {
+        view! { <HomePage initial={start::Initial::Ten} /> }.into_any()
     }
 }
 
@@ -89,6 +132,23 @@ impl LazyRoute for ConsoleRoute {
     }
 
     fn view(_this: Self) -> AnyView {
-        view! { <Outlet /> }.into_any()
+        let session = RwSignal::new(true);
+        let session_check = Resource::new(
+            move || session.try_get().unwrap_or_default(),
+            |_| async move { start::login_check().await },
+        );
+
+        view! {
+          <Transition fallback={move || {
+            view! { "" }
+          }}>
+            {move || match session_check.try_get() {
+              Some(Some(true)) => view! { <Outlet /> }.into_any(),
+              _ => view! { "Invalid session" }.into_any(),
+            }}
+
+          </Transition>
+        }
+        .into_any()
     }
 }
